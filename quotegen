@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+    <body>
+<title>quote generator</title>
+<header>quote generation</header>
+<h2>this generates quotes</h2>
+<h4>press space/spacebar</h4>
+<br>
+
+
+id="randomquote"
+<script src="randomquotes.js"></script>
+
+
+    </body>
+</html>
