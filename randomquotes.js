@@ -7226,9 +7226,6 @@ function showrandomquote() {
   document.getElementById("quote").textContent = randomquotes[i];
 }
 
-// listen for spacebar //
-document.addEventListener("keydown", function (event) {
-  if (event.code === "Space") {
-    showrandomquote();
-  }
-});
+// listen for any input //
+document.addEventListener("keydown", showrandomquote);
+document.addEventListener("click", showrandomquote);
