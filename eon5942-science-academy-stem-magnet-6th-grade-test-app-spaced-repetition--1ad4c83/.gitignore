@@ -1,0 +1,6 @@
+# Nix build artifacts
+result
+result-*
+
+# OS
+.DS_Store
