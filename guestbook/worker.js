@@ -587,17 +587,56 @@ function viewRegister(app) {
 
 async function viewBookmarks(app) {
   var data = await api('GET', '/bookmarks');
-  var h = '<div class="crumb"><a href="#/">Home</a> &raquo; Bookmarks</div><h2 class="mh">Your Bookmarks</h2>';
+  var ext = await api('GET', '/ext-bookmarks');
+  var h = '<div class="crumb"><a href="#/">Home</a> &raquo; Bookmarks</div>';
+  h += '<h2 class="mh">External Recs</h2>';
+  h += '<div class="box"><form id="extf">' +
+    '<label>AO3 link</label><input type="text" id="ex_url" placeholder="https://archiveofourown.org/works/...">' +
+    '<label>Title</label><input type="text" id="ex_title" placeholder="title">' +
+    '<label>Author</label><input type="text" id="ex_author" placeholder="author">' +
+    '<label>Fandom</label><input type="text" id="ex_fandom" placeholder="fandom">' +
+    '<label>Notes</label><input type="text" id="ex_notes" placeholder="optional">' +
+    '<div style="margin-top:10px"><button type="submit">Add Rec</button></div>' +
+    '</form></div>';
+  var elist = ext.bookmarks || [];
+  if (!elist.length) h += '<p>no saved links yet.</p>';
+  for (var i = 0; i < elist.length; i++) {
+    var e = elist[i];
+    h += '<div class="box work"><h3><a href="' + esc(e.url) + '" target="_blank" rel="noopener">' + esc(e.title || e.url) + '</a></h3>' +
+         '<div class="author">by ' + esc(e.author || 'unknown') + '</div>';
+    if (e.fandom) h += '<div class="fandom">Fandom: ' + esc(e.fandom) + '</div>';
+    if (e.notes) h += '<div class="summary">' + esc(e.notes) + '</div>';
+    h += '<div style="font-size:11px;margin-top:4px"><a href="#" data-del="' + e.id + '">remove</a></div></div>';
+  }
+  h += '<h2 class="mh">Your Works Bookmarks</h2>';
   var list = data.bookmarks || [];
-  if (!list.length) h += '<p>you have no bookmarks yet.</p>';
-  for (var i = 0; i < list.length; i++) {
-    var b = list[i];
+  if (!list.length) h += '<p>you have no bookmarks on this archive yet.</p>';
+  for (var j = 0; j < list.length; j++) {
+    var b = list[j];
     h += '<div class="box work"><h3><a href="#/works/' + b.work_id + '">' + esc(b.title) + '</a></h3>' +
          '<div class="author">by ' + esc(b.author || 'anonymous') + '</div>';
     if (b.notes) h += '<div class="summary">notes: ' + esc(b.notes) + '</div>';
     h += '</div>';
   }
   app.innerHTML = h;
+  document.getElementById('extf').addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    var payload = {
+      url: document.getElementById('ex_url').value.trim(),
+      title: document.getElementById('ex_title').value.trim(),
+      author: document.getElementById('ex_author').value.trim(),
+      fandom: document.getElementById('ex_fandom').value.trim(),
+      notes: document.getElementById('ex_notes').value.trim()
+    };
+    api('POST', '/ext-bookmarks', payload).then(function () { location.reload(); }).catch(function (err) { alert(err.message); });
+  });
+  var dels = app.querySelectorAll('[data-del]');
+  for (var d = 0; d < dels.length; d++) {
+    dels[d].addEventListener('click', function (ev) {
+      ev.preventDefault();
+      api('DELETE', '/ext-bookmarks/' + this.getAttribute('data-del')).then(function () { location.reload(); });
+    });
+  }
 }
 
 async function viewFandoms(app) {
@@ -986,6 +1025,38 @@ async function ao3Api(request, env, url) {
       "SELECT b.work_id, b.notes, b.private, w.title, u.username AS author FROM bookmarks b JOIN works w ON w.id = b.work_id JOIN users u ON u.id = w.user_id WHERE b.user_id = ? ORDER BY b.id DESC"
     ).bind(user.id).all();
     return json({ bookmarks: r.results });
+  }
+
+  if (route === "/ext-bookmarks" && method === "GET") {
+    const user = await getUser(request, env);
+    if (!user) return json({ error: "log in" }, 401);
+    const r = await env.DB.prepare("SELECT id, title, author, fandom, url, notes, created_at FROM ext_bookmarks WHERE user_id = ? ORDER BY id DESC").bind(user.id).all();
+    return json({ bookmarks: r.results });
+  }
+
+  if (route === "/ext-bookmarks" && method === "POST") {
+    const user = await getUser(request, env);
+    if (!user) return json({ error: "log in" }, 401);
+    const b = await getBody(request);
+    const url = String(b.url || "").trim();
+    const title = String(b.title || "").trim();
+    if (!title) return json({ error: "title required" }, 400);
+    if (!/^https?:\/\//.test(url)) return json({ error: "link must start with http(s)" }, 400);
+    if (url.length > 2000 || title.length > 300) return json({ error: "too long" }, 400);
+    const info = await env.DB.prepare("INSERT INTO ext_bookmarks (user_id, title, author, fandom, url, notes) VALUES (?, ?, ?, ?, ?, ?)")
+      .bind(user.id, title, String(b.author || "").trim().slice(0, 100), String(b.fandom || "").trim().slice(0, 200), url, String(b.notes || "").trim().slice(0, 1000)).run();
+    return json({ id: info.meta.last_row_id });
+  }
+
+  let exm = route.match(/^\/ext-bookmarks\/(\d+)$/);
+  if (exm && method === "DELETE") {
+    const user = await getUser(request, env);
+    if (!user) return json({ error: "log in" }, 401);
+    const id = parseInt(exm[1], 10);
+    const row = await env.DB.prepare("SELECT id FROM ext_bookmarks WHERE id = ? AND user_id = ?").bind(id, user.id).first();
+    if (!row) return json({ error: "not found" }, 404);
+    await env.DB.prepare("DELETE FROM ext_bookmarks WHERE id = ?").bind(id).run();
+    return json({ ok: true });
   }
 
   return json({ error: "not found" }, 404);
