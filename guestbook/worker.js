@@ -267,7 +267,7 @@ function renderShell() {
     '</ul></div>';
   document.getElementById('ao3footer').innerHTML =
     '<div class="in">' +
-    '<a href="https://eons.gay/ao3#/">Home</a><a href="#/about">About Us</a><a href="#/contact">Contact Us</a>' +
+    '<a href="https://eons.gay/ao3#/">Home</a><a href="#/about">About Us</a><a href="#/tos">Terms of Service</a><a href="#/contact">Contact Us</a>' +
     '<div class="copy">not affiliated with the OTW or AO3. this is a section of eons.gay.</div>' +
     '</div>';
 }
@@ -685,6 +685,23 @@ function viewContact(app) {
     '</div>';
 }
 
+function viewTos(app) {
+  app.innerHTML =
+    '<div class="crumb"><a href="#/">Home</a> &raquo; Terms of Service</div>' +
+    '<h2 class="mh">Terms of Service</h2>' +
+    '<div class="box">' +
+    '<p><b>1. acceptance.</b> by using this archive you agree to these terms.</p>' +
+    '<p><b>2. your content.</b> you keep ownership of the works you post. by posting, you grant this site a license to store and display them. do not post work you did not write or do not have permission to post.</p>' +
+    '<p><b>3. rules.</b> no hate, slurs, or harassment. no doxxing or personal info. nothing illegal. rate your works honestly.</p>' +
+    '<p><b>4. mature content.</b> mature and explicit fanfiction is allowed, but it must be rated and tagged. you confirm you are old enough to view and post it.</p>' +
+    '<p><b>5. moderation.</b> content is filtered automatically and may be removed, and accounts suspended, without notice.</p>' +
+    '<p><b>6. copyright.</b> do not repost work that is not yours. to report infringement, email <a href="mailto:eonsproton@proton.me">eonsproton@proton.me</a>.</p>' +
+    '<p><b>7. account.</b> passwords are stored hashed, never in plaintext. you are responsible for activity on your account.</p>' +
+    '<p><b>8. disclaimer.</b> provided as-is, with no warranty. this site is not affiliated with the Organization for Transformative Works or Archive of Our Own.</p>' +
+    '<p><b>9. changes.</b> these terms may change at any time.</p>' +
+    '</div>';
+}
+
 function viewAuthPrompt(app, msg) {
   app.innerHTML =
     '<div class="box" style="max-width:420px;margin:48px auto;text-align:center">' +
@@ -708,6 +725,7 @@ async function route() {
     if (h === '#/tags') return await viewTags(app);
     if (h === '#/about') return viewAbout(app);
     if (h === '#/contact') return viewContact(app);
+    if (h === '#/tos') return viewTos(app);
     if (reply) return await viewWork(app, reply[1], reply[2]);
     var edit = h.match(/^#\\/edit\\/(\\d+)$/);
     if (edit) { if (!S.me) return viewAuthPrompt(app, 'log in to edit a work'); return await viewEdit(app, edit[1]); }
