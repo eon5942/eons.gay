@@ -263,12 +263,11 @@ function renderShell() {
     '<li><a href="#/">About</a><ul class="sub">' +
     '<li><a href="#/about">About Us</a></li>' +
     '<li><a href="#/">News</a></li>' +
-    '<li><a href="#/faq">FAQ</a></li>' +
     '</ul></li>' +
     '</ul></div>';
   document.getElementById('ao3footer').innerHTML =
     '<div class="in">' +
-    '<a href="#/">Home</a><a href="#/about">About Us</a><a href="#/faq">FAQ</a><a href="#/contact">Contact Us</a>' +
+    '<a href="https://eons.gay/ao3#/">Home</a><a href="#/about">About Us</a><a href="#/contact">Contact Us</a>' +
     '<div class="copy">not affiliated with the OTW or AO3. this is a section of eons.gay.</div>' +
     '</div>';
 }
@@ -633,20 +632,8 @@ function viewAbout(app) {
     '<div class="crumb"><a href="#/">Home</a> &raquo; About Us</div>' +
     '<h2 class="mh">About Us</h2>' +
     '<div class="box">' +
-    '<p>this is a section of <a href="https://eons.gay">eons.gay</a> that mirrors the look and feel of Archive of Our Own while the real archive is down. it is not affiliated with, endorsed by, or connected to the Organization for Transformative Works (OTW) or AO3.</p>' +
-    '<p>you can post works, leave kudos, comment, and bookmark. everything lives in a small database on this site.</p>' +
-    '</div>';
-}
-
-function viewFaq(app) {
-  app.innerHTML =
-    '<div class="crumb"><a href="#/">Home</a> &raquo; FAQ</div>' +
-    '<h2 class="mh">FAQ</h2>' +
-    '<div class="box">' +
-    '<p><b>is this the real AO3?</b><br>no. the real one is at archiveofourown.org. this is a mirror on eons.gay.</p>' +
-    '<p><b>do i need an account?</b><br>to post works or bookmark, yes. reading, kudos, and guest comments work without one.</p>' +
-    '<p><b>what are the rules?</b><br>be nice. no slurs or hate. works and comments are filtered automatically.</p>' +
-    '<p><b>are my passwords stored?</b><br>only as a salted PBKDF2 hash. plaintext is never stored.</p>' +
+    '<p>hey. i made this because the real AO3 was down and i wanted somewhere to post. it is a working archive on <a href="https://eons.gay">eons.gay</a> that looks and acts like AO3 &mdash; post works, leave kudos, comment, bookmark.</p>' +
+    '<p>it is not affiliated with the Organization for Transformative Works or the real AO3 at archiveofourown.org.</p>' +
     '</div>';
 }
 
@@ -655,12 +642,15 @@ function viewContact(app) {
     '<div class="crumb"><a href="#/">Home</a> &raquo; Contact Us</div>' +
     '<h2 class="mh">Contact Us</h2>' +
     '<div class="box">' +
-    '<p>for issues with this mirror, hit up the site owner:</p>' +
-    '<ul>' +
-    '<li>github: <a href="https://github.com/eon5942">eon5942</a></li>' +
-    '<li>site: <a href="https://eons.gay">eons.gay</a></li>' +
-    '</ul>' +
-    '<p>for the real AO3, contact the OTW at archiveofourown.org.</p>' +
+    '<p>email: <a href="mailto:eonsproton@proton.me">eonsproton@proton.me</a></p>' +
+    '</div>';
+}
+
+function viewAuthPrompt(app, msg) {
+  app.innerHTML =
+    '<div class="box" style="max-width:420px;margin:48px auto;text-align:center">' +
+    '<p>' + esc(msg || 'you need an account for that') + '</p>' +
+    '<p><a href="#/login"><button>Log In</button></a> <a href="#/register"><button class="secondary">Sign Up</button></a></p>' +
     '</div>';
 }
 
@@ -671,18 +661,17 @@ async function route() {
   try {
     if (h === '#/') return await viewHome(app);
     if (h === '#/works') return await viewWorks(app);
-    if (h === '#/new') { if (!S.me) { alert('log in to post'); return location.hash = '#/login'; } return viewPost(app); }
+    if (h === '#/new') { if (!S.me) return viewAuthPrompt(app, 'log in to post a work'); return viewPost(app); }
     if (h === '#/login') return viewLogin(app);
     if (h === '#/register') return viewRegister(app);
-    if (h === '#/bookmarks') { if (!S.me) return location.hash = '#/login'; return await viewBookmarks(app); }
+    if (h === '#/bookmarks') { if (!S.me) return viewAuthPrompt(app, 'log in to view your bookmarks'); return await viewBookmarks(app); }
     if (h === '#/fandoms') return await viewFandoms(app);
     if (h === '#/tags') return await viewTags(app);
     if (h === '#/about') return viewAbout(app);
-    if (h === '#/faq') return viewFaq(app);
     if (h === '#/contact') return viewContact(app);
     if (reply) return await viewWork(app, reply[1], reply[2]);
     var edit = h.match(/^#\\/edit\\/(\\d+)$/);
-    if (edit) { if (!S.me) return location.hash = '#/login'; return await viewEdit(app, edit[1]); }
+    if (edit) { if (!S.me) return viewAuthPrompt(app, 'log in to edit a work'); return await viewEdit(app, edit[1]); }
     var single = h.match(/^#\\/works\\/(\\d+)$/);
     if (single) return await viewWork(app, single[1]);
     return await viewHome(app);
