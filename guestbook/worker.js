@@ -453,8 +453,8 @@ async function viewWork(app, id) {
   if (data.is_owner) h += '<a href="#/edit/' + w.id + '"><button class="secondary">Edit</button></a> <button id="delBtn" class="secondary">Delete</button>';
   h += '</div>';
   h += '<hr style="border:none;border-top:1px solid #ddd">';
-  var paras = (w.body || '').split(/\n\s*\n/).filter(Boolean);
-  for (var p = 0; p < paras.length; p++) h += '<p>' + esc(paras[p]).replace(/\n/g, '<br>') + '</p>';
+  var paras = (w.body || '').split(/\\n\\s*\\n/).filter(Boolean);
+  for (var p = 0; p < paras.length; p++) h += '<p>' + esc(paras[p]).replace(/\\n/g, '<br>') + '</p>';
   if (!paras.length) h += '<p>(no work text)</p>';
   h += '<hr style="border:none;border-top:1px solid #ddd">';
   h += '<h3 style="color:#900">Comments (' + (w.comments_count || 0) + ')</h3>';
@@ -631,7 +631,7 @@ async function doLogout() {
 async function route() {
   var app = document.getElementById('app');
   var h = location.hash || '#/';
-  var reply = h.match(/^#\/works\/(\d+)\/reply\/(\d+)$/);
+  var reply = h.match(/^#\\/works\\/(\\d+)\\/reply\\/(\\d+)$/);
   try {
     if (h === '#/') return await viewHome(app);
     if (h === '#/works') return await viewWorks(app);
@@ -642,9 +642,9 @@ async function route() {
     if (h === '#/fandoms') return await viewFandoms(app);
     if (h === '#/tags') return await viewTags(app);
     if (reply) return await viewWork(app, reply[1], reply[2]);
-    var edit = h.match(/^#\/edit\/(\d+)$/);
+    var edit = h.match(/^#\\/edit\\/(\\d+)$/);
     if (edit) { if (!S.me) return location.hash = '#/login'; return await viewEdit(app, edit[1]); }
-    var single = h.match(/^#\/works\/(\d+)$/);
+    var single = h.match(/^#\\/works\\/(\\d+)$/);
     if (single) return await viewWork(app, single[1]);
     return await viewHome(app);
   } catch (e) {
