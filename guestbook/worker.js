@@ -261,14 +261,14 @@ function renderShell() {
     '<li><a href="#/tags">Tags</a></li>' +
     '</ul></li>' +
     '<li><a href="#/">About</a><ul class="sub">' +
-    '<li><a href="#/">About Us</a></li>' +
+    '<li><a href="#/about">About Us</a></li>' +
     '<li><a href="#/">News</a></li>' +
-    '<li><a href="#/">FAQ</a></li>' +
+    '<li><a href="#/faq">FAQ</a></li>' +
     '</ul></li>' +
     '</ul></div>';
   document.getElementById('ao3footer').innerHTML =
     '<div class="in">' +
-    '<a href="#/">Home</a><a href="#/">About Us</a><a href="#/">FAQ</a><a href="#/">Contact Us</a>' +
+    '<a href="#/">Home</a><a href="#/about">About Us</a><a href="#/faq">FAQ</a><a href="#/contact">Contact Us</a>' +
     '<div class="copy">not affiliated with the OTW or AO3. this is a section of eons.gay.</div>' +
     '</div>';
 }
@@ -628,6 +628,42 @@ async function doLogout() {
   location.hash = '#/';
 }
 
+function viewAbout(app) {
+  app.innerHTML =
+    '<div class="crumb"><a href="#/">Home</a> &raquo; About Us</div>' +
+    '<h2 class="mh">About Us</h2>' +
+    '<div class="box">' +
+    '<p>this is a section of <a href="https://eons.gay">eons.gay</a> that mirrors the look and feel of Archive of Our Own while the real archive is down. it is not affiliated with, endorsed by, or connected to the Organization for Transformative Works (OTW) or AO3.</p>' +
+    '<p>you can post works, leave kudos, comment, and bookmark. everything lives in a small database on this site.</p>' +
+    '</div>';
+}
+
+function viewFaq(app) {
+  app.innerHTML =
+    '<div class="crumb"><a href="#/">Home</a> &raquo; FAQ</div>' +
+    '<h2 class="mh">FAQ</h2>' +
+    '<div class="box">' +
+    '<p><b>is this the real AO3?</b><br>no. the real one is at archiveofourown.org. this is a mirror on eons.gay.</p>' +
+    '<p><b>do i need an account?</b><br>to post works or bookmark, yes. reading, kudos, and guest comments work without one.</p>' +
+    '<p><b>what are the rules?</b><br>be nice. no slurs or hate. works and comments are filtered automatically.</p>' +
+    '<p><b>are my passwords stored?</b><br>only as a salted PBKDF2 hash. plaintext is never stored.</p>' +
+    '</div>';
+}
+
+function viewContact(app) {
+  app.innerHTML =
+    '<div class="crumb"><a href="#/">Home</a> &raquo; Contact Us</div>' +
+    '<h2 class="mh">Contact Us</h2>' +
+    '<div class="box">' +
+    '<p>for issues with this mirror, hit up the site owner:</p>' +
+    '<ul>' +
+    '<li>github: <a href="https://github.com/eon5942">eon5942</a></li>' +
+    '<li>site: <a href="https://eons.gay">eons.gay</a></li>' +
+    '</ul>' +
+    '<p>for the real AO3, contact the OTW at archiveofourown.org.</p>' +
+    '</div>';
+}
+
 async function route() {
   var app = document.getElementById('app');
   var h = location.hash || '#/';
@@ -641,6 +677,9 @@ async function route() {
     if (h === '#/bookmarks') { if (!S.me) return location.hash = '#/login'; return await viewBookmarks(app); }
     if (h === '#/fandoms') return await viewFandoms(app);
     if (h === '#/tags') return await viewTags(app);
+    if (h === '#/about') return viewAbout(app);
+    if (h === '#/faq') return viewFaq(app);
+    if (h === '#/contact') return viewContact(app);
     if (reply) return await viewWork(app, reply[1], reply[2]);
     var edit = h.match(/^#\\/edit\\/(\\d+)$/);
     if (edit) { if (!S.me) return location.hash = '#/login'; return await viewEdit(app, edit[1]); }
@@ -667,7 +706,12 @@ boot();
 </html>`;
 
 function json(data, status) {
-  return new Response(JSON.stringify(data), { status: status || 200, headers: { "content-type": "application/json;charset=utf-8" } });
+  return new Response(JSON.stringify(data), { status: status || 200, headers: {
+    "content-type": "application/json;charset=utf-8",
+    "x-content-type-options": "nosniff",
+    "x-frame-options": "DENY",
+    "referrer-policy": "no-referrer"
+  }});
 }
 
 async function getBody(req) { try { return await req.json(); } catch (e) { return {}; } }
@@ -696,6 +740,14 @@ async function getUser(request, env) {
   if (!m) return null;
   var row = await env.DB.prepare("SELECT u.id, u.username FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token = ?").bind(m[1]).first();
   return row || null;
+}
+
+function hasSlur(text) {
+  var norm = String(text || "").toLowerCase()
+    .replace(/0/g, "o").replace(/1/g, "i").replace(/3/g, "e").replace(/4/g, "a").replace(/5/g, "s").replace(/7/g, "t")
+    .replace(/[^a-z]+/g, "")
+    .replace(/([a-z])\1+/g, "$1");
+  return /(niger|niga|fag|retard|trany|kike|chink|spic|coon|wetback|dyke|beaner|gook|paki|kaffir)/.test(norm);
 }
 
 const RATINGS = ["Not Rated", "General Audiences", "Teen And Up Audiences", "Mature", "Explicit"];
@@ -769,10 +821,11 @@ async function ao3Api(request, env, url) {
     const where = []; const args = [];
     if (search) {
       const like = "%" + search.replace(/%/g, "\\%").replace(/_/g, "\\_") + "%";
-      where.push("(w.title LIKE ? OR w.fandom LIKE ? OR w.freeform LIKE ? OR w.characters LIKE ? OR w.relationships LIKE ? OR w.summary LIKE ? OR u.username LIKE ?)");
+      const esc = " ESCAPE '\\'";
+      where.push("(w.title LIKE ?" + esc + " OR w.fandom LIKE ?" + esc + " OR w.freeform LIKE ?" + esc + " OR w.characters LIKE ?" + esc + " OR w.relationships LIKE ?" + esc + " OR w.summary LIKE ?" + esc + " OR u.username LIKE ?" + esc + ")");
       for (let i = 0; i < 7; i++) args.push(like);
     }
-    if (fandom) { where.push("w.fandom LIKE ?"); args.push("%" + fandom.replace(/%/g, "\\%") + "%"); }
+    if (fandom) { where.push("w.fandom LIKE ? ESCAPE '\\'"); args.push("%" + fandom.replace(/%/g, "\\%").replace(/_/g, "\\_") + "%"); }
     if (rating) { where.push("w.rating = ?"); args.push(rating); }
     const ws = where.length ? "WHERE " + where.join(" AND ") : "";
     let order = "w.updated_at DESC";
@@ -794,8 +847,16 @@ async function ao3Api(request, env, url) {
     const b = await getBody(request);
     const title = String(b.title || "").trim();
     const body = String(b.body || "").trim();
+    const fandom = String(b.fandom || "").trim();
+    const relationships = String(b.relationships || "").trim();
+    const characters = String(b.characters || "").trim();
+    const freeform = String(b.freeform || "").trim();
+    const summary = String(b.summary || "").trim();
     if (!title) return json({ error: "title required" }, 400);
     if (!body) return json({ error: "work text required" }, 400);
+    if (title.length > 200 || fandom.length > 200 || relationships.length > 500 || characters.length > 500 || freeform.length > 500 || summary.length > 2000) return json({ error: "field too long" }, 400);
+    if (body.length > 200000) return json({ error: "work too long" }, 400);
+    if (hasSlur(title + "\n" + summary + "\n" + body + "\n" + fandom + "\n" + relationships + "\n" + characters + "\n" + freeform)) return json({ error: "be nice" }, 400);
     const ip = request.headers.get("CF-Connecting-IP") || "unknown";
     const recent = await env.DB.prepare("SELECT COUNT(*) AS n FROM works WHERE user_id = ? AND created_at > datetime('now', '-10 minutes')").bind(user.id).first();
     if (recent.n >= 10) return json({ error: "slow down" }, 429);
@@ -803,9 +864,8 @@ async function ao3Api(request, env, url) {
     const words = body.split(/\s+/).filter(Boolean).length;
     const info = await env.DB.prepare(
       "INSERT INTO works (user_id, title, fandom, rating, warnings, categories, relationships, characters, freeform, summary, body, words) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-    ).bind(user.id, title, String(b.fandom || "").trim(), rating, String(b.warnings || "").trim(), String(b.categories || "").trim(),
-      String(b.relationships || "").trim(), String(b.characters || "").trim(), String(b.freeform || "").trim(),
-      String(b.summary || "").trim(), body, words).run();
+    ).bind(user.id, title, fandom, rating, String(b.warnings || "").trim(), String(b.categories || "").trim(),
+      relationships, characters, freeform, summary, body, words).run();
     return json({ id: info.meta.last_row_id });
   }
 
@@ -842,15 +902,22 @@ async function ao3Api(request, env, url) {
       const b = await getBody(request);
       const title = String(b.title != null ? b.title : w.title).trim();
       const body = String(b.body != null ? b.body : w.body);
+      const fandom = String(b.fandom != null ? b.fandom : w.fandom).trim();
+      const relationships = String(b.relationships != null ? b.relationships : w.relationships).trim();
+      const characters = String(b.characters != null ? b.characters : w.characters).trim();
+      const freeform = String(b.freeform != null ? b.freeform : w.freeform).trim();
+      const summary = String(b.summary != null ? b.summary : w.summary).trim();
       if (!title) return json({ error: "title required" }, 400);
+      if (title.length > 200 || fandom.length > 200 || relationships.length > 500 || characters.length > 500 || freeform.length > 500 || summary.length > 2000) return json({ error: "field too long" }, 400);
+      if (body.length > 200000) return json({ error: "work too long" }, 400);
+      if (hasSlur(title + "\n" + summary + "\n" + body + "\n" + fandom + "\n" + relationships + "\n" + characters + "\n" + freeform)) return json({ error: "be nice" }, 400);
       const words = body.split(/\s+/).filter(Boolean).length;
       const rating = RATINGS.includes(b.rating) ? b.rating : w.rating;
       await env.DB.prepare(
         "UPDATE works SET title=?, fandom=?, rating=?, warnings=?, categories=?, relationships=?, characters=?, freeform=?, summary=?, body=?, words=?, updated_at=datetime('now') WHERE id=?"
-      ).bind(title, String(b.fandom != null ? b.fandom : w.fandom).trim(), rating,
+      ).bind(title, fandom, rating,
         String(b.warnings != null ? b.warnings : w.warnings).trim(), String(b.categories != null ? b.categories : w.categories).trim(),
-        String(b.relationships != null ? b.relationships : w.relationships).trim(), String(b.characters != null ? b.characters : w.characters).trim(),
-        String(b.freeform != null ? b.freeform : w.freeform).trim(), String(b.summary != null ? b.summary : w.summary).trim(),
+        relationships, characters, freeform, summary,
         body, words, id).run();
       return json({ id: id });
     }
@@ -893,6 +960,7 @@ async function ao3Api(request, env, url) {
     const body = String(b.body || "").trim();
     if (!body) return json({ error: "empty comment" }, 400);
     if (body.length > 5000) return json({ error: "comment too long" }, 400);
+    if (hasSlur(body)) return json({ error: "be nice" }, 400);
     const user = await getUser(request, env);
     const ip = request.headers.get("CF-Connecting-IP") || "unknown";
     const recent = await env.DB.prepare("SELECT COUNT(*) AS n FROM comments WHERE work_id = ? AND created_at > datetime('now', '-60 seconds')").bind(id).first();
@@ -942,7 +1010,12 @@ export default {
       return await ao3Api(request, env, url);
     }
     if (url.pathname === "/ao3" || url.pathname === "/ao3/") {
-      return new Response(AO3_HTML, { headers: { "content-type": "text/html;charset=utf-8" } });
+      return new Response(AO3_HTML, { headers: {
+        "content-type": "text/html;charset=utf-8",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY",
+        "referrer-policy": "no-referrer"
+      }});
     }
 
     if (url.pathname === "/api/entries") {
@@ -952,11 +1025,7 @@ export default {
         var message = String(body.message || "").trim();
         if (!message) return Response.json({ error: "empty message" }, { status: 400 });
         if (message.length > 500) return Response.json({ error: "too long" }, { status: 400 });
-        var norm = message.toLowerCase()
-          .replace(/0/g, "o").replace(/1/g, "i").replace(/3/g, "e").replace(/4/g, "a").replace(/5/g, "s").replace(/7/g, "t")
-          .replace(/[^a-z]+/g, "")
-          .replace(/([a-z])\1+/g, "$1");
-        if (/(niger|niga|fag|retard|trany|kike|chink|spic|coon|wetback|dyke|beaner|gook|paki|kaffir)/.test(norm)) return Response.json({ error: "be nice" }, { status: 400 });
+        if (hasSlur(message)) return Response.json({ error: "be nice" }, { status: 400 });
         var token = String(body.token || "");
         if (!token) return Response.json({ error: "forbidden" }, { status: 403 });
         var remoteip = request.headers.get("CF-Connecting-IP") || "";
